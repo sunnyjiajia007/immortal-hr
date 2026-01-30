@@ -8,7 +8,7 @@
 📸 宗门图录 (Screenshots)
 
 <div align="center">
-<img src="https://www.google.com/search?q=https://via.placeholder.com/800x450%3Ftext%3DImmortal%2BDashboard%2BPreview" alt="主界面预览：韩立的属性面板" width="800"/>
+"主界面预览"
 <p><i><img width="1488" height="933" alt="image" src="https://github.com/user-attachments/assets/ce7de225-ff8c-4c3d-9d49-a91a5f2d0340" />
 </i></p>
 </div>
