@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>职场修真与炼器 Pro - 仙门人才管理中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;700;900&display=swap');
+        
+        :root {
+            --spirit-blue: #38bdf8;
+            --alchemy-gold: #f59e0b;
+            --void-dark: #020617;
+            --card-bg: rgba(15, 23, 42, 0.85);
+        }
+
+        body { 
+            font-family: 'Noto Sans SC', sans-serif; 
+            background-color: var(--void-dark); 
+            color: #e2e8f0;
+            background-image: 
+                radial-gradient(circle at 30% 0%, rgba(56, 189, 248, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 70% 100%, rgba(245, 158, 11, 0.08) 0%, transparent 40%);
+            overflow: hidden;
+        }
+
+        .ancient-font { font-family: 'Noto Serif SC', serif; }
+
+        .glass-card { 
+            background: var(--card-bg);
+            backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border-radius: 1.5rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .spirit-border {
+            position: relative;
+        }
+        .spirit-border::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 1.5rem;
+            padding: 1px;
+            background: linear-gradient(135deg, var(--spirit-blue), transparent, var(--alchemy-gold));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .tab-active { 
+            color: var(--spirit-blue);
+            background: rgba(56, 189, 248, 0.15);
+            border-bottom: 2px solid var(--spirit-blue);
+        }
+
+        .power-glow {
+            text-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
+        }
+
+        .tooltip { position: relative; }
+        .tooltip:hover::after {
+            content: attr(data-tip);
+            position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+            padding: 10px 14px; background: #0f172a; color: #fff; border: 1px solid var(--spirit-blue);
+            border-radius: 8px; font-size: 12px; white-space: normal; width: 240px; z-index: 100; 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.8);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: #1e293b;
+            height: 4px;
+            border-radius: 10px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px; height: 16px;
+            background: var(--spirit-blue);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 12px var(--spirit-blue);
+            border: 2px solid #fff;
+        }
+
+        .ai-loading {
+            background: linear-gradient(90deg, #38bdf8, #f59e0b, #38bdf8);
+            background-size: 200% auto;
+            animation: shine 2s linear infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        @keyframes shine { to { background-position: 200% center; } }
+
+        .voice-loader {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(56, 189, 248, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--spirit-blue);
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.2); border-radius: 10px; }
+        
+        .truncate-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        /* Modal Animation */
+        #modal-overlay.hidden { display: none; }
+        #modal-overlay:not(.hidden) { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="flex h-screen p-4 gap-4">
+
+    <!-- Sidebar -->
+    <aside class="w-72 flex flex-col glass-card bg-slate-900/40 border-slate-800/50 flex-shrink-0">
+        <div class="p-6 border-b border-white/5 text-center">
+            <h1 class="ancient-font text-xl font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-amber-400">职场修真图录</h1>
+            <p class="text-[8px] text-slate-500 mt-1 uppercase tracking-widest opacity-60">Immortal Career Management</p>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-3" id="player-list"></div>
+        
+        <div class="p-4 border-t border-white/5">
+            <button onclick="openNewPlayerModal()" class="w-full bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 py-3 rounded-2xl text-[10px] font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-tighter hover:shadow-lg hover:shadow-sky-500/10 active:scale-95">
+                <span class="text-lg leading-none">+</span> 感应新入世弟子
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col gap-6 pr-2 min-w-0">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900/60 p-8 rounded-3xl border border-white/5 relative overflow-hidden flex-shrink-0 min-h-[140px]">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-sky-500/30 to-transparent"></div>
+            
+            <div class="flex items-center gap-8 w-full md:w-auto">
+                <div class="relative max-w-[300px]">
+                    <h2 id="current-player-name" class="ancient-font text-5xl md:text-6xl font-bold text-white tracking-wider leading-relaxed truncate-name drop-shadow-lg">未选择</h2>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span id="header-current-rank" class="text-[10px] font-bold text-sky-300 bg-sky-300/10 px-3 py-1 rounded-full border border-sky-300/20 shadow-sm">职级: -</span>
+                        <span id="spirit-id" class="text-[9px] text-slate-500 font-mono tracking-widest uppercase">ID: 000</span>
+                    </div>
+                </div>
+                
+                <div class="h-20 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent mx-4 hidden md:block"></div>
+                
+                <div class="text-center min-w-[120px] hidden md:block tooltip" data-tip="天道酬勤：后天造化权重 1.3倍，先天根骨权重 0.7倍。勤修苦练，方可逆天改命！">
+                    <span class="text-[9px] text-slate-400 font-bold uppercase tracking-[0.3em] block mb-1">综合修为战力</span>
+                    <div class="flex items-baseline justify-center gap-1">
+                        <span id="header-power-badge" class="ancient-font text-5xl font-bold text-amber-400 power-glow tracking-tighter leading-none transition-all duration-300">0.0</span>
+                        <span class="text-[10px] text-amber-500/60 font-bold">PT</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-end gap-3 mt-4 md:mt-0 ml-auto">
+                <div class="flex items-center gap-2 px-3 py-1 bg-emerald-500/5 border border-emerald-500/20 rounded-full hidden md:flex">
+                    <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>
+                    <span class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">识海已同步</span>
+                </div>
+                <button onclick="saveCurrentVersion()" class="group bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-lg shadow-sky-900/30 transition-all flex items-center gap-2 transform active:scale-95">
+                    <span class="group-hover:rotate-12 transition-transform">◈</span> 刻录此时道果
+                </button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="flex space-x-2 p-1.5 bg-slate-900/60 rounded-2xl border border-white/5 self-start shadow-inner flex-shrink-0">
+            <button id="tab-profile" onclick="switchTab('profile')" class="px-8 py-2.5 rounded-xl text-[11px] font-black transition-all tab-active uppercase tracking-widest">个人评估</button>
+            <button id="tab-growth" onclick="switchTab('growth')" class="px-8 py-2.5 rounded-xl text-[11px] font-black text-slate-500 hover:text-white transition-all uppercase tracking-widest">成长趋势</button>
+            <button id="tab-org" onclick="switchTab('org')" class="px-8 py-2.5 rounded-xl text-[11px] font-black text-slate-500 hover:text-white transition-all uppercase tracking-widest">宗门架构</button>
+        </nav>
+
+        <!-- Appraisal View -->
+        <div id="view-profile" class="grid grid-cols-12 gap-6 pb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <!-- Left: Inputs -->
+            <div class="col-span-12 lg:col-span-4 space-y-6">
+                <section class="glass-card spirit-border p-6">
+                    <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">当前仙位职阶</h3>
+                    <select id="select-current-rank" onchange="updatePlayerRank(this.value)" class="w-full bg-slate-950 text-xs border border-white/10 rounded-xl p-4 focus:ring-1 focus:ring-sky-500/50 outline-none text-sky-100 shadow-inner cursor-pointer hover:border-sky-500/30 transition-colors"></select>
+                </section>
+
+                <section class="glass-card p-6">
+                    <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">时光回溯轴</h3>
+                    <div id="version-timeline" class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar"></div>
+                </section>
+
+                <section class="glass-card p-6 space-y-8">
+                    <div>
+                        <h3 class="text-[10px] font-black text-amber-500 uppercase tracking-[0.3em] mb-5 flex justify-between items-end">
+                            <span>先天根骨 (0.7x)</span>
+                            <span class="text-[8px] opacity-40 font-normal tracking-normal">天赋 · 权重低</span>
+                        </h3>
+                        <div id="innate-controls" class="space-y-5"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-[10px] font-black text-sky-500 uppercase tracking-[0.3em] mb-5 flex justify-between items-end">
+                            <span>后天造化 (1.3x)</span>
+                            <span class="text-[8px] opacity-40 font-normal tracking-normal">技能 · 权重高</span>
+                        </h3>
+                        <div id="acquired-controls" class="space-y-5"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right: Display -->
+            <div class="col-span-12 lg:col-span-8 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Energy -->
+                    <div class="glass-card p-8 border-t-2 border-sky-500 shadow-[0_10px_40px_-10px_rgba(56,189,248,0.1)]">
+                        <div class="flex justify-between items-end mb-5">
+                            <div>
+                                <h3 class="font-black text-xl tracking-tight text-white">识海灵气</h3>
+                                <p class="text-[9px] text-slate-500 italic mt-1 uppercase tracking-wider">Soul Energy</p>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[9px] text-slate-500 font-bold uppercase mb-1">因果负荷设定</span>
+                                <input type="range" id="input-stress" class="w-24 accent-sky-500">
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-900 h-5 rounded-full p-1 border border-white/5 mb-5 overflow-hidden shadow-inner relative">
+                            <div class="absolute inset-0 bg-repeat-x opacity-10" style="background-image: linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent); background-size: 1rem 1rem;"></div>
+                            <div id="energy-bar" class="h-full rounded-full transition-all duration-1000 relative z-10"></div>
+                        </div>
+                        <div class="flex justify-between items-start gap-4">
+                            <p id="energy-txt" class="text-xs text-slate-400 leading-relaxed italic"></p>
+                            <button id="btn-voice-care" onclick="playAIVoiceCare()" class="flex-shrink-0 flex items-center gap-1.5 bg-sky-500/10 hover:bg-sky-500/20 px-4 py-2 rounded-full border border-sky-500/20 transition-all hover:shadow-[0_0_15px_rgba(56,189,248,0.2)]">
+                                <span id="voice-icon" class="text-sky-400 text-xs">✨</span>
+                                <span class="text-[10px] font-bold text-sky-400 uppercase tracking-widest">仙音垂怜</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Suggestion -->
+                    <div class="glass-card p-8 border-l-4 border-amber-500 bg-gradient-to-br from-amber-500/[0.05] to-transparent relative overflow-hidden">
+                        <div class="absolute -right-8 -bottom-8 text-9xl text-amber-500 opacity-[0.03] rotate-12 select-none">☯</div>
+                        <h3 class="font-black text-amber-500 flex items-center gap-2 mb-4 text-xs uppercase tracking-widest">
+                            <span class="text-lg">☯</span> 洞察天机
+                        </h3>
+                        <div id="ai-suggestion-container" class="min-h-[90px]">
+                            <p id="ai-suggestion" class="text-xs text-slate-300 leading-relaxed italic"></p>
+                        </div>
+                        <button id="btn-deep-analysis" onclick="getAIDeepAnalysis()" class="mt-4 text-[10px] font-bold bg-amber-900/40 hover:bg-amber-800/60 px-5 py-2 rounded-full text-amber-300 border border-amber-500/30 transition-all shadow-lg shadow-amber-900/20">
+                            ✨ 消耗神念推演
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Radar & Rank -->
+                <div class="glass-card p-8 flex flex-col md:flex-row gap-8 min-h-[500px]">
+                    <div class="flex-1 relative">
+                        <canvas id="mainRadarChart"></canvas>
+                    </div>
+                    <div class="w-full md:w-80 space-y-8 border-l border-white/5 md:pl-8 pt-4 md:pt-0">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">师徒传承</label>
+                            <div id="mentor-box" class="mt-4 p-5 bg-slate-900/60 rounded-3xl border border-white/5 transition-all hover:border-white/10">
+                                <div id="mentor-name" class="font-black text-amber-400 text-lg italic">感应中...</div>
+                                <div id="mentor-reason" class="text-[11px] text-slate-500 mt-2 leading-relaxed italic"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">飞升推演</label>
+                            <div class="mt-5 space-y-5">
+                                <div class="flex justify-between items-end">
+                                    <div class="text-2xl font-black text-emerald-400 ancient-font" id="current-rank-display">-</div>
+                                    <div class="text-[9px] text-slate-600 font-bold" id="next-rank-label">NEXT: -</div>
+                                </div>
+                                <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden shadow-inner border border-white/5">
+                                    <div id="rank-progress" class="h-full bg-emerald-500 transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.3)]"></div>
+                                </div>
+                                <div id="promotion-advice" class="bg-emerald-950/30 p-5 rounded-2xl text-[11px] text-slate-400 leading-relaxed border border-emerald-500/10 italic"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Battle Log -->
+                <section class="glass-card p-8">
+                    <div class="flex justify-between items-center mb-5">
+                        <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">历练战果记录 (BATTLE LOG)</h3>
+                        <button id="btn-refine" onclick="refineBattleLogWithAI()" class="text-[10px] font-bold bg-sky-900/40 hover:bg-sky-800/60 px-5 py-2 rounded-full text-sky-300 border border-sky-500/20 transition-all">✨ 仙法洗炼</button>
+                    </div>
+                    <textarea id="battle-log" placeholder="在此刻录弟子在红尘历练中斩获的种种功绩..." class="w-full bg-slate-950/40 border border-white/5 rounded-2xl p-5 text-sm focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/30 focus:outline-none h-32 italic text-slate-300 placeholder-slate-600 transition-all"></textarea>
+                </section>
+            </div>
+        </div>
+
+        <div id="view-growth" class="hidden glass-card p-10 space-y-8 animate-in fade-in zoom-in duration-500">
+            <div class="h-[500px]"><canvas id="growthLineChart"></canvas></div>
+            <p id="growth-summary" class="text-base text-slate-300 italic border-l-2 border-sky-500 pl-6 py-2"></p>
+        </div>
+
+        <div id="view-org" class="hidden glass-card p-10 space-y-8 animate-in fade-in duration-500">
+            <h2 class="ancient-font text-3xl font-black tracking-widest text-sky-400 uppercase drop-shadow-md">宗门阶梯设定</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="space-y-4">
+                    <label class="text-xs font-bold text-slate-500 uppercase">职级路径描述</label>
+                    <textarea id="org-ranks" class="w-full bg-slate-950/60 border border-white/10 rounded-2xl p-6 text-sm h-72 font-mono leading-relaxed focus:ring-1 focus:ring-sky-500/50 outline-none text-sky-100">
+P1 杂役弟子 (战力:40)
+P2 外门弟子 (战力:60)
+P3 内门弟子 (战力:75)
+P4 核心真传 (战力:85)
+P5 宗门长老 (战力:95)
+                    </textarea>
+                </div>
+                <div class="flex flex-col justify-end">
+                    <div class="p-6 bg-slate-900/40 rounded-2xl border border-white/5">
+                        <p class="text-[10px] text-slate-500 italic mb-4 leading-relaxed">提示：重铸架构将实时影响所有弟子的飞升推演逻辑。请确保格式正确。</p>
+                        <button onclick="saveOrgSettings()" class="w-full bg-sky-600 hover:bg-sky-500 text-slate-950 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-sky-900/20">重铸宗门架构</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Global Modal Overlay -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4 transition-all duration-300">
+        <div class="glass-card p-8 w-full max-w-sm transform transition-all scale-100 opacity-100 border border-sky-500/30 shadow-[0_0_50px_rgba(56,189,248,0.2)]">
+            <h3 id="modal-title" class="ancient-font text-xl font-bold text-white mb-6 tracking-widest text-center">提示</h3>
+            <div id="modal-content" class="mb-8"></div>
+            <div class="flex justify-end gap-4">
+                <button onclick="closeModal()" class="px-6 py-2.5 rounded-xl text-slate-400 hover:bg-white/5 text-xs font-bold border border-transparent hover:border-white/10 transition-all">取消</button>
+                <button id="modal-confirm" class="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-900/40 transition-all">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; // API Key 留空，由环境自动注入
+        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
+        const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+
+        let activePlayerId = 'p1';
+        let activeVersionIndex = 1;
+        let radarChart, lineChart, currentAudio;
+        let isVoiceLoading = false;
+        let modalCallback = null;
+
+        const DEFINITIONS = {
+            execution: "落地执行：任务交付的速度、准度与闭环力。",
+            crit: "破局暴击：解决高难度突发问题的爆发能力。",
+            knowledge: "道法积累：专业领域知识的深度与广度储备。",
+            innovation: "悟性创新：打破常规、创造新局面的灵感力。",
+            judgement: "推演判断：在海量信息中做出正确抉择的眼界。",
+            adaptability: "御风应变：面对环境巨变时的心理韧性与调整力。",
+            communication: "仙音共鸣：信息同步的清晰度与跨部门说服力。",
+            cooperation: "阵法协同：牺牲局部、成就大局的团队精神。",
+            coordination: "运筹帷幄：调配复杂资源与统筹流程的组织力。",
+            decision: "乾坤果断：承重任、拍板定、担后果的决策气魄。",
+            stress: "情绪稳定：泰山崩于前而色不变，情绪的短时护盾。",
+            responsibility: "契约业力：对最终目标不折不扣的责任担当。",
+            physique: "仙脉体魄：支持持续高强度脑力活动的身体底子。",
+            toughness: "意志坚韧：咬定青山不放松，长期逆境中的回血能力。"
+        };
+
+        const STATS_CONFIG = [
+            { id: 'execution', name: '执行能力', category: 'acquired' },
+            { id: 'crit', name: '暴击几率', category: 'innate' },
+            { id: 'knowledge', name: '知识积累', category: 'acquired' },
+            { id: 'innovation', name: '感悟创新', category: 'innate' },
+            { id: 'judgement', name: '精准判断', category: 'acquired' },
+            { id: 'adaptability', name: '应变能力', category: 'innate' },
+            { id: 'communication', name: '沟通能力', category: 'acquired' },
+            { id: 'cooperation', name: '合作精神', category: 'acquired' },
+            { id: 'coordination', name: '组织协调', category: 'acquired' },
+            { id: 'decision', name: '决断能力', category: 'innate' },
+            { id: 'stress', name: '情绪稳定', category: 'innate' },
+            { id: 'responsibility', name: '责任意识', category: 'acquired' },
+            { id: 'physique', name: '体魄强度', category: 'acquired' },
+            { id: 'toughness', name: '意志坚韧', category: 'innate' }
+        ];
+
+        let players = [
+            { id: 'p1', name: '张小明', currentRank: 'P1 杂役弟子', history: [
+                { date: '2025-06-01', stats: { execution: 50, crit: 30, knowledge: 40, innovation: 60, judgement: 40, adaptability: 50, communication: 40, cooperation: 70, coordination: 30, decision: 40, stress: 70, responsibility: 80, physique: 80, toughness: 60 }, battleLog: "初步引气入体，根骨尚可，需磨炼身法。", stress: 20 },
+                { date: '2025-12-30', stats: { execution: 75, crit: 45, knowledge: 65, innovation: 70, judgement: 55, adaptability: 65, communication: 55, cooperation: 80, coordination: 50, decision: 55, stress: 75, responsibility: 90, physique: 75, toughness: 75 }, battleLog: "独立斩获核心项目，修为突飞猛进。", stress: 55 }
+            ]},
+            { id: 'p2', name: '老周', currentRank: 'P3 内门弟子', history: [
+                { date: '2026-01-01', stats: { execution: 95, crit: 40, knowledge: 95, innovation: 40, judgement: 90, adaptability: 80, communication: 85, cooperation: 90, coordination: 95, decision: 85, stress: 90, responsibility: 98, physique: 70, toughness: 95 }, battleLog: "宗门基石，道法精深，擅护大局。", stress: 30 }
+            ]}
+        ];
+
+        // --- Modal System ---
+        function showModal(title, contentHTML, callback) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-content').innerHTML = contentHTML;
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            modalCallback = callback;
+            
+            const input = document.getElementById('modal-input');
+            if (input) setTimeout(() => input.focus(), 100);
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            modalCallback = null;
+        }
+
+        document.getElementById('modal-confirm').onclick = () => {
+            if (modalCallback) modalCallback();
+            closeModal();
+        };
+
+        function openNewPlayerModal() {
+            showModal("感应新入世弟子", 
+                `<input id="modal-input" type="text" placeholder="输入弟子道号" class="w-full bg-slate-950/50 border border-white/10 rounded-xl p-4 text-sm focus:outline-none focus:border-sky-500 text-white placeholder-slate-600 text-center">`,
+                () => {
+                    const n = document.getElementById('modal-input').value.trim();
+                    if (!n) return showToast("道号不可为空！");
+                    const newId = 'p' + (players.length + 1) + Date.now();
+                    players.push({ id: newId, name: n, currentRank: 'P1 杂役弟子', history: [{ date: new Date().toISOString().split('T')[0], stats: getActiveStats(), battleLog: "初始入世", stress: 10 }] });
+                    loadPlayerData(newId);
+                    showToast(`✨ 成功感应弟子：${n}`);
+                }
+            );
+        }
+
+        function openDeleteModal(e, id) {
+            e.stopPropagation();
+            showModal("逐出宗门", 
+                `<p class="text-slate-300 text-sm text-center leading-relaxed">确定要将此弟子逐出宗门吗？<br><span class="text-red-400 text-xs">此操作将斩断一切因果，不可逆转。</span></p>`, 
+                () => {
+                    const idx = players.findIndex(p => p.id === id);
+                    if (idx > -1) {
+                        const isCurrent = id === activePlayerId;
+                        players.splice(idx, 1);
+                        showToast("弟子已逐出宗门。");
+                        if (players.length === 0) {
+                            renderPlayerList();
+                            document.getElementById('current-player-name').innerText = "无弟子";
+                            activePlayerId = null;
+                        } else if (isCurrent) {
+                            loadPlayerData(players[0].id);
+                        } else {
+                            renderPlayerList();
+                        }
+                    }
+                }
+            );
+        }
+
+        // --- Logic ---
+        async function callGemini(prompt, systemInstruction = "") {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+            let delay = 1000;
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const res = await fetch(url, { 
+                        method: 'POST', 
+                        body: JSON.stringify({ 
+                            contents: [{ parts: [{ text: prompt }] }], 
+                            systemInstruction: { parts: [{ text: systemInstruction }] } 
+                        }) 
+                    });
+                    const data = await res.json();
+                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
+                    throw new Error("Empty AI response");
+                } catch (e) { await new Promise(r => setTimeout(r, delay)); delay *= 2; }
+            }
+            throw new Error("API Failed");
+        }
+
+        function pcmToWav(base64Data, sampleRate = 24000) {
+            const binaryString = atob(base64Data.replace(/[^A-Za-z0-9+/=]/g, ""));
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+            const buffer = new ArrayBuffer(44 + len);
+            const view = new DataView(buffer);
+            const writeString = (offset, string) => { for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i)); };
+            writeString(0, 'RIFF'); view.setUint32(4, 36 + len, true); writeString(8, 'WAVE');
+            writeString(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true); writeString(36, 'data'); view.setUint32(40, len, true);
+            for (let i = 0; i < len; i++) view.setUint8(44 + i, bytes[i]);
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        async function playAIVoiceCare() {
+            if (isVoiceLoading) return;
+            isVoiceLoading = true;
+            const btn = document.getElementById('btn-voice-care');
+            const icon = document.getElementById('voice-icon');
+            icon.className = 'voice-loader'; icon.innerText = '';
+            btn.classList.add('opacity-40', 'cursor-not-allowed');
+
+            try {
+                const energyTxt = document.getElementById('energy-txt').innerText;
+                const player = players.find(p => p.id === activePlayerId);
+                const txt = await callGemini(`你是 ${player.name} 的仙师。基于状态：${energyTxt}，说一段安慰的话。30字内。`, "温润如玉仙道导师。");
+                
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`;
+                const res = await fetch(url, { method: 'POST', body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: `慈祥地说：${txt}` }] }],
+                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } },
+                    model: TTS_MODEL
+                })});
+                const d = await res.json();
+                const part = d.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                const blob = pcmToWav(part.inlineData.data, 24000);
+                if (currentAudio) currentAudio.pause();
+                currentAudio = new Audio(URL.createObjectURL(blob));
+                currentAudio.onended = resetVoiceBtn;
+                currentAudio.play();
+                showToast("✨ 仙音降临...");
+            } catch (e) { resetVoiceBtn(); showToast("感应失败。"); }
+        }
+
+        function resetVoiceBtn() {
+            isVoiceLoading = false;
+            document.getElementById('voice-icon').className = '';
+            document.getElementById('voice-icon').innerText = '✨';
+            document.getElementById('btn-voice-care').classList.remove('opacity-40', 'cursor-not-allowed');
+        }
+
+        function updateAnalysis() {
+            const stats = getActiveStats();
+            const stress = parseInt(document.getElementById('input-stress').value);
+            const player = players.find(p => p.id === activePlayerId);
+            if (!player) return;
+
+            let weightedSum = 0;
+            STATS_CONFIG.forEach(s => {
+                const val = stats[s.id];
+                let weight = s.category === 'innate' ? 0.7 : 1.3;
+                let bonus = val >= 90 ? 3 : 0;
+                weightedSum += (val * weight) + bonus;
+            });
+            const avg = weightedSum / 14; 
+
+            document.getElementById('current-player-name').innerText = player.name;
+            document.getElementById('header-power-badge').innerText = avg.toFixed(1);
+            document.getElementById('header-current-rank').innerText = `职级: ${player.currentRank}`;
+            document.getElementById('current-rank-display').innerText = player.currentRank;
+            document.getElementById('spirit-id').innerText = `ID: ${player.id.toUpperCase()}`;
+
+            // Radar
+            if (!radarChart) {
+                const ctx = document.getElementById('mainRadarChart').getContext('2d');
+                radarChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: { labels: STATS_CONFIG.map(s => s.name), datasets: [{ data: STATS_CONFIG.map(s => stats[s.id]), backgroundColor: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', borderWidth: 2, pointBackgroundColor: '#38bdf8' }] },
+                    options: { 
+                        scales: { r: { grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { color: 'rgba(255,255,255,0.05)' }, pointLabels: { color: '#94a3b8', font: { size: 9 } }, ticks: { display: false, max: 100, min: 0 } } },
+                        plugins: { legend: { display: false } }, maintainAspectRatio: false 
+                    }
+                });
+            } else {
+                radarChart.data.datasets[0].data = STATS_CONFIG.map(s => stats[s.id]);
+                radarChart.update();
+            }
+
+            const t = stats.toughness || 50;
+            const energy = Math.max(0, Math.min(100, (100 - (stress * (1.8 - t/100))).toFixed(0)));
+            const eBar = document.getElementById('energy-bar');
+            eBar.style.width = energy + '%';
+            if (energy > 75) { eBar.className = 'h-full rounded-full bg-emerald-500 shadow-[0_0_15px_#10b981]'; document.getElementById('energy-txt').innerText = "灵气充盈：道心无尘，稳如泰山。"; }
+            else if (energy > 45) { eBar.className = 'h-full rounded-full bg-amber-500 shadow-[0_0_15px_#f59e0b]'; document.getElementById('energy-txt').innerText = "灵气损耗：外魔入侵，建议闭关调理。"; }
+            else { eBar.className = 'h-full rounded-full bg-red-600 shadow-[0_0_15px_#ef4444]'; document.getElementById('energy-txt').innerText = "警告：灵气枯竭！心魔已生，速速介入。"; }
+
+            const oR = document.getElementById('org-ranks').value.split('\n').filter(l => l.trim()).map(line => {
+                const name = line.split('(')[0].trim();
+                const match = line.match(/战力:(\d+)/);
+                return { name, val: match ? parseInt(match[1]) : 0 };
+            });
+            const cI = oR.findIndex(r => r.name === player.currentRank);
+            const targetRank = (cI !== -1 && cI < oR.length - 1) ? oR[cI+1] : { name: "飞升", val: 100 };
+            document.getElementById('next-rank-label').innerText = `NEXT: ${targetRank.name}`;
+            document.getElementById('rank-progress').style.width = Math.min(100, (avg / targetRank.val * 100)) + '%';
+            
+            const gaps = STATS_CONFIG.map(s => ({ name: s.name, gap: targetRank.val - stats[s.id] })).sort((a,b)=>b.gap-a.gap).slice(0, 1);
+            document.getElementById('promotion-advice').innerText = `飞升 ${targetRank.name} 标准，首要突破：${gaps[0].name} (欠 ${gaps[0].gap.toFixed(0)} 修为)。`;
+
+            const weakest = STATS_CONFIG.map(s => ({id:s.id, val:stats[s.id], name:s.name})).sort((a,b)=>a.val-b.val)[0];
+            const mentor = players.find(p => p.id !== activePlayerId && p.history[p.history.length-1].stats[weakest.id] > 80);
+            if (mentor) { document.getElementById('mentor-name').innerText = mentor.name; document.getElementById('mentor-reason').innerText = `擅长“${weakest.name}”，可指点迷津。`; }
+            else { document.getElementById('mentor-name').innerText = "缘分未到..."; document.getElementById('mentor-reason').innerText = ""; }
+        }
+
+        async function refineBattleLogWithAI() {
+            const l = document.getElementById('battle-log').value;
+            if(!l) return showToast("无战果记录。");
+            document.getElementById('battle-log').value = "✨ 正在提炼...";
+            try {
+                const r = await callGemini(`提炼此战果为3条：\n${l}`, "HR管理仙师。");
+                document.getElementById('battle-log').value = r;
+            } catch(e) { showToast("提炼中断。"); }
+        }
+
+        async function getAIDeepAnalysis() {
+            const stats = getActiveStats();
+            const box = document.getElementById('ai-suggestion');
+            box.innerHTML = '<span class="ai-loading font-bold">✨ 推演中...</span>';
+            try {
+                const r = await callGemini(`弟子属性:${JSON.stringify(stats)}, 负荷:${document.getElementById('input-stress').value}。管理策略。100字。`, "命理大师。");
+                box.innerText = r;
+            } catch(e) { box.innerText = "推演失败。"; }
+        }
+
+        function initControls() {
+            const iC = document.getElementById('innate-controls'), aC = document.getElementById('acquired-controls');
+            STATS_CONFIG.forEach(s => {
+                const row = document.createElement('div');
+                row.className = 'tooltip flex items-center justify-between text-[10px] mb-1';
+                row.setAttribute('data-tip', DEFINITIONS[s.id]);
+                row.innerHTML = `<label class="w-16 text-slate-500 border-b border-white/5 cursor-help truncate">${s.name}</label>
+                    <input type="range" data-stat="${s.id}" min="1" max="100" class="mx-2 flex-1">
+                    <span class="w-6 text-right font-mono text-sky-400 font-bold" id="val-${s.id}">0</span>`;
+                (s.category==='innate' ? iC : aC).appendChild(row);
+                row.querySelector('input').oninput = (e) => { document.getElementById(`val-${s.id}`).innerText = e.target.value; updateAnalysis(); };
+            });
+            document.getElementById('input-stress').oninput = updateAnalysis;
+        }
+
+        function loadPlayerData(id) {
+            activePlayerId = id;
+            const p = players.find(p => p.id === id);
+            
+            document.getElementById('ai-suggestion').innerHTML = ''; // Clear AI insight
+            
+            if (p) {
+                activeVersionIndex = p.history.length - 1;
+                updateRankSelector(); 
+                renderPlayerList(); 
+                renderVersionTimeline(p); 
+                loadVersion(activeVersionIndex);
+                updateGrowthChart(); 
+            }
+        }
+
+        function updateRankSelector() {
+            const p = players.find(p => p.id === activePlayerId);
+            if (!p) return;
+            const s = document.getElementById('select-current-rank');
+            const o = document.getElementById('org-ranks').value.split('\n').filter(l=>l.trim());
+            s.innerHTML = o.map(line => { const n = line.split('(')[0].trim(); return `<option value="${n}" ${n===p.currentRank?'selected':''}>${n}</option>`; }).join('');
+        }
+
+        function updatePlayerRank(r) { players.find(p => p.id === activePlayerId).currentRank = r; updateAnalysis(); showToast(`职阶同步: ${r}`); }
+
+        function deletePlayer(e, id) {
+            e.stopPropagation();
+            openDeleteModal(e, id);
+        }
+
+        function renderPlayerList() {
+            const list = document.getElementById('player-list');
+            if (players.length === 0) {
+                list.innerHTML = '<div class="text-center text-slate-500 text-xs mt-10">宗门空荡荡...</div>';
+                return;
+            }
+            list.innerHTML = players.map(p => `
+                <div onclick="loadPlayerData('${p.id}')" class="group relative p-4 rounded-2xl cursor-pointer transition-all ${p.id===activePlayerId ? 'bg-sky-500/10 spirit-border' : 'hover:bg-slate-800 text-slate-500'}">
+                    <div class="text-xs font-bold flex items-center justify-between">
+                        <span class="${p.id===activePlayerId ? 'text-sky-300' : ''}">${p.name}</span>
+                        ${p.id===activePlayerId ? '<span class="w-1.5 h-1.5 bg-sky-400 rounded-full animate-pulse shadow-[0_0_8px_#38bdf8]"></span>' : ''}
+                    </div>
+                    <div class="text-[8px] opacity-40 mt-1 uppercase font-bold tracking-tighter">${p.currentRank}</div>
+                    <button onclick="deletePlayer(event, '${p.id}')" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1" title="逐出宗门">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>`).join('');
+        }
+
+        function renderVersionTimeline(p) {
+            document.getElementById('version-timeline').innerHTML = p.history.map((v, idx) => `
+                <div onclick="loadVersion(${idx})" class="p-2 text-[10px] rounded-lg mb-1 flex justify-between cursor-pointer transition-all ${idx === activeVersionIndex ? 'bg-sky-500/15 text-sky-400' : 'bg-slate-800/50 text-slate-500 hover:text-slate-300'}">
+                    <span>📅 ${v.date}</span><span>#${idx+1}阶段</span>
+                </div>`).join('');
+        }
+
+        function loadVersion(idx) {
+            activeVersionIndex = idx;
+            const p = players.find(p => p.id === activePlayerId);
+            if (!p) return;
+            const v = p.history[idx];
+            STATS_CONFIG.forEach(s => {
+                const val = v.stats[s.id] || 50;
+                document.querySelector(`input[data-stat="${s.id}"]`).value = val;
+                document.getElementById(`val-${s.id}`).innerText = val;
+            });
+            document.getElementById('battle-log').value = v.battleLog;
+            document.getElementById('input-stress').value = v.stress;
+            
+            updateAnalysis();
+        }
+
+        function getActiveStats() { const r = {}; STATS_CONFIG.forEach(s => r[s.id] = parseInt(document.querySelector(`input[data-stat="${s.id}"]`).value)); return r; }
+
+        function switchTab(t) {
+            ['profile', 'growth', 'org'].forEach(tab => { document.getElementById(`view-${tab}`).classList.add('hidden'); document.getElementById(`tab-${tab}`).classList.remove('tab-active'); });
+            document.getElementById(`view-${t}`).classList.remove('hidden'); document.getElementById(`tab-${t}`).classList.add('tab-active');
+            if(t==='growth') updateGrowthChart();
+        }
+
+        function updateGrowthChart() {
+            const p = players.find(p => p.id === activePlayerId);
+            if (!p) return;
+            // REMOVED check for history length < 2 so chart renders even with 1 point
+            
+            const labels = p.history.map(h => h.date);
+            
+            // --- Consistent Growth Calculation V3.0 ---
+            const data = p.history.map(h => {
+                let wSum = 0;
+                STATS_CONFIG.forEach(s => {
+                    const val = h.stats[s.id] || 0;
+                    // Apply same V3.0 logic: Acquired 1.3, Innate 0.7
+                    let w = s.category === 'innate' ? 0.7 : 1.3;
+                    let b = val >= 90 ? 3 : 0;
+                    wSum += (val * w) + b;
+                });
+                return wSum / 14;
+            });
+
+            if(!lineChart) lineChart = new Chart(document.getElementById('growthLineChart').getContext('2d'), { type:'line', data: { labels, datasets: [{ label:'战力进化', data, borderColor:'#38bdf8', tension:0.3, fill:true, backgroundColor:'rgba(56,189,248,0.03)' }] }, options: { maintainAspectRatio:false, plugins: { legend: { display:false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } } });
+            else { lineChart.data.labels = labels; lineChart.data.datasets[0].data = data; lineChart.update(); }
+            
+            if (data.length > 1) {
+                const growth = (data[data.length-1]-data[0]).toFixed(1);
+                document.getElementById('growth-summary').innerText = `历时多月，修为精进 ${growth} 点。`;
+            } else {
+                document.getElementById('growth-summary').innerText = `初入宗门，大道始于足下。当前战力基准：${data[0].toFixed(1)}`;
+            }
+        }
+
+        function saveOrgSettings() { updateRankSelector(); updateAnalysis(); showToast("仙门重铸成功。"); }
+
+        function saveCurrentVersion() {
+            const p = players.find(p => p.id === activePlayerId);
+            if (!p) return;
+            p.history.push({ date: new Date().toISOString().split('T')[0], stats: getActiveStats(), battleLog: document.getElementById('battle-log').value, stress: parseInt(document.getElementById('input-stress').value) });
+            loadPlayerData(activePlayerId); showToast("存档成功。");
+        }
+
+        function showToast(m) {
+            const d = document.createElement('div');
+            d.className = "fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 border border-sky-400/50 text-sky-400 px-8 py-2 rounded-full shadow-2xl z-50 text-[10px] font-bold animate-bounce backdrop-blur-xl";
+            d.innerText = m; document.body.appendChild(d); setTimeout(() => d.remove(), 2500);
+        }
+
+        window.onload = () => { initControls(); loadPlayerData('p1'); };
+    </script>
+</body>
+</html>
